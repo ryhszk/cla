@@ -1,32 +1,88 @@
 package main
 
 import (
-	"github.com/rivo/tview"
+	"fmt"
+	"os"
+	"os/exec"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
+func execCmd(cmd string) {
+	c := exec.Command("sh", "-c", cmd)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	c.Run()
+}
+
+type model struct {
+	cursor   int
+	choices  []string
+	selected map[int]struct{}
+}
+
+var mdata = model{
+	cursor:   1,
+	choices:  []string{"ls -la", "free -h", "top", "./count", "dstat"},
+	selected: make(map[int]struct{}),
+}
+
+func (m model) Init() tea.Cmd {
+	return nil
+}
+
+var isexeccmd bool = false
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down", "j":
+			if m.cursor < len(m.choices)-1 {
+				m.cursor++
+			}
+		case "enter", " ":
+			isexeccmd = true
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+func (m model) View() string {
+	s := "Please select a command from next list.\n\n"
+	for i, choice := range m.choices {
+		cursor := " "
+		if m.cursor == i {
+			cursor = ">"
+		}
+		s += fmt.Sprintf("[%s] %s\n", cursor, choice)
+	}
+	// s += fmt.Sprintf("%d\n", m.cursor)
+	s += "\nPress q to quit.\n"
+	return s
+}
+
+func (m model) getCursor() int {
+	return m.cursor
+}
+
 func main() {
-	app := tview.NewApplication()
+	p := tea.NewProgram(&mdata)
+	if err := p.Start(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
 
-	a := tview.NewTextView()
-	a.SetText("textarea(a)")
-
-	b := tview.NewTextView()
-	b.SetTitle("title(b)").
-		SetBorder(true)
-	b.SetText("bbbbbbbbbb")
-
-	c := tview.NewTextView()
-	c.SetTitle("title(c)").
-		SetTitleAlign(tview.AlignRight).
-		SetBorder(true)
-	c.SetText("ccccccccccc")
-
-	flex := tview.NewFlex().
-		AddItem(a, 0, 1, false).
-		AddItem(b, 0, 1, false).
-		AddItem(c, 0, 1, false)
-
-	if err := app.SetRoot(flex, true).Run(); err != nil {
-		panic(err)
+	if isexeccmd {
+		cmd := mdata.choices[mdata.cursor]
+		execCmd(cmd)
 	}
 }
