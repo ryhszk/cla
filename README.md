@@ -2,7 +2,7 @@ CLL (Command Line Launcher)
 ============================
 
 [![Go](https://github.com/ryhszk/cll/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/ryhszk/cll/actions/workflows/go.yml)
-[![GitHub](https://img.shields.io/github/license/ryhszk/cll))](https://github.com/ryhszk/cll/blob/main/LICENSE)
+[![GitHub](https://img.shields.io/github/license/ryhszk/cll)](https://github.com/ryhszk/cll/blob/main/LICENSE)
 
 This is a TUI command line launcher.
 
