@@ -4,12 +4,26 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func getShellName() string {
+	var shn string
+	switch runtime.GOOS {
+	case "windows":
+		shn = "bash.exe"
+	case "linux":
+		shn = "sh"
+	default:
+		shn = "sh"
+	}
+	return shn
+}
+
 func execCmd(cmd string) {
-	c := exec.Command("sh", "-c", cmd)
+	c := exec.Command(getShellName(), "-c", cmd)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
