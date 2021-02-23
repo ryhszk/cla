@@ -1,10 +1,18 @@
-# cll (command line launcher)
+CLL (Command Line Launcher)
+============================
 
 This is a TUI command line launcher written in the Go lang.
+
+# Support OS
+
+- Linux
+- Windows (TBD)
 
 # Installation
 
 ```
+$ git clone https://github.com/ryhszk/cll
+$ cd cll
 $ go install
 ```
 
