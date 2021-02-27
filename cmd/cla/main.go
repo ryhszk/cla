@@ -10,14 +10,12 @@ import (
 	"os/exec"
 	"runtime"
 
-	cfg "github.com/ryhszk/cla/config"
-
 	tinp "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	ter "github.com/muesli/termenv"
 )
 
-const focusedTextColor = cfg.Config.focusedTextColor
+const focusedTextColor = "82"
 const unfocusedTextColor = "245"
 
 var (

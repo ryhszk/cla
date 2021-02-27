@@ -25,7 +25,7 @@ type ConfigList struct {
 var Config ConfigList
 
 func init() {
-	cfg, err := ini.Load("config.ini")
+	cfg, err := ini.Load("cionfig.ini")
 	if err != nil {
 		log.Printf("Failed to read config.ini: %v", err)
 		os.Exit(1)
