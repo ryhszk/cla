@@ -1,0 +1,5 @@
+ps aux | grep main.go
+lolcat | sl
+dstat
+top
+test
