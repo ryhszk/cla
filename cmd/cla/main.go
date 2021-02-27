@@ -13,15 +13,23 @@ import (
 	tinp "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	ter "github.com/muesli/termenv"
+	cfg "github.com/ryhszk/cla/config"
 )
-
-const focusedTextColor = "82"
-const unfocusedTextColor = "245"
 
 var (
 	color         = ter.ColorProfile().Color
 	focusedPrompt = colorSetting("⇒ ", focusedTextColor)
 	blurredPrompt = "  "
+
+	focusedTextColor   = cfg.Config.FocusedTextColor
+	unfocusedTextColor = cfg.Config.UnfocusedTextColor
+	dataFile           = cfg.Config.DataFile
+	limitLineNumber    = cfg.Config.LimitLine
+	execKey            = cfg.Config.ExecKey
+	saveKey            = cfg.Config.SaveKey
+	delKey             = cfg.Config.DelKey
+	addKey             = cfg.Config.AddKey
+	quitKey            = cfg.Config.QuitKey
 	// focusedSubmitButton = "[ " + ter.String("Save").Foreground(color("82")).String() + " ]"
 	// blurredSubmitButton = "[ " + ter.String("Save").Foreground(color("240")).String() + " ]"
 )
@@ -73,14 +81,10 @@ type model struct {
 	// submitButton string
 }
 
-const settingFile string = ".clarc"
-
-const limitLineNumber = 32
-
 func readFromFile() []string {
-	f, err := os.OpenFile(settingFile, os.O_RDONLY, 0644)
+	f, err := os.OpenFile(dataFile, os.O_RDONLY, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "File %s could not open: %v\n", settingFile, err)
+		fmt.Fprintf(os.Stderr, "File %s could not open: %v\n", dataFile, err)
 		os.Exit(1)
 	}
 	defer f.Close()
@@ -94,25 +98,25 @@ func readFromFile() []string {
 		}
 	}
 	if serr := scanner.Err(); serr != nil {
-		fmt.Fprintf(os.Stderr, "File %s scan error: %v\n", settingFile, err)
+		fmt.Fprintf(os.Stderr, "File %s scan error: %v\n", dataFile, err)
 	}
 
 	return lines
 }
 
 func writeToFile(lines string) {
-	err := ioutil.WriteFile(settingFile, []byte(lines), 0644)
+	err := ioutil.WriteFile(dataFile, []byte(lines), 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "File %s could not write: %v\n", settingFile, err)
+		fmt.Fprintf(os.Stderr, "File %s could not write: %v\n", dataFile, err)
 		os.Exit(1)
 	}
 }
 
 func writeToFileWithBlankLine() {
 	// fmt.Println("execute this")
-	f, err := os.OpenFile(settingFile, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(dataFile, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "File %s could not write: %v\n", settingFile, err)
+		fmt.Fprintf(os.Stderr, "File %s could not write: %v\n", dataFile, err)
 	}
 	defer f.Close()
 
@@ -201,11 +205,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 
-		case "ctrl+q", "ctrl+z":
+		case quitKey:
 			close(m.choice)
 			return m, tea.Quit
 
-		case "ctrl+a":
+		case addKey:
 			if len(m.cmdInputs) < limitLineNumber {
 				writeToFileWithBlankLine()
 				m.addModel()
@@ -216,7 +220,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// case "ctrl+d":
 
 		// Cycle between inputs
-		case "tab", "shift+tab", "enter", "up", "down", "ctrl+s", "ctrl+d":
+		case "tab", "shift+tab", execKey, "up", "down", saveKey, delKey:
 
 			s := msg.String()
 
@@ -233,13 +237,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// 	selectCmd = inputs[m.index].Value()
 			// 	return m, tea.Quit
 			// }
-			if s == "ctrl+s" {
+			if s == saveKey {
 				for i := 0; i < len(m.cmdInputs); i++ {
 					cmdlines += m.cmdInputs[i].Value() + "\n"
 				}
 				writeToFile(cmdlines)
 				//return m, tea.Quit
-			} else if s == "ctrl+d" {
+			} else if s == delKey {
 				for i, cmd := range readFromFile() {
 					if i == m.index {
 						continue
@@ -255,7 +259,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				//return m, tea.Quit
 			}
 
-			if s == "enter" {
+			if s == execKey {
 				m.choice <- m.cmdInputs[m.index].Value()
 				return m, tea.Quit
 			}
