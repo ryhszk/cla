@@ -1,2 +1,5 @@
-ls
-free | grep Mem
+ps aux | grep main.go
+lolcat | sl
+dstat
+top
+test
