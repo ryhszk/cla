@@ -101,15 +101,27 @@ func isZeroSize(fp *os.File) bool {
 	return false
 }
 
+func isExists(name string) bool {
+	_, err := os.Stat(name)
+	return err != nil
+}
+
 func readFromJSON(fpath string) []Data {
 
-	if f, err := os.Stat(fpath); os.IsNotExist(err) || f.IsDir() {
-		dir, _ := filepath.Split(fpath)
+	dir, _ := filepath.Split(fpath)
+	if isExists(dir) {
 		if err := os.Mkdir(dir, 0774); err != nil {
 			outErrorExit(err.Error())
 		}
-
 	}
+
+	// if f, err := os.Stat(fpath); os.IsNotExist(err) || f.IsDir() {
+	// 	dir, _ := filepath.Split(fpath)
+	// 	if err := os.Mkdir(dir, 0774); err != nil {
+	// 		outErrorExit(err.Error())
+	// 	}
+
+	// }
 
 	fp, err := os.OpenFile(fpath, os.O_RDONLY|os.O_CREATE, 0664)
 	if err != nil {

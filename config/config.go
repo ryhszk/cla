@@ -37,7 +37,7 @@ exec_key = enter
 save_key = ctrl+s
 del_key  = ctrl+d
 add_key  = ctrl+a
-quit_key = ctrl+z
+quit_key = ctrl+c
 
 [data]
 data_file = data.json
@@ -72,20 +72,14 @@ func writeToFile(bytes, fPath string) {
 func init() {
 	fpath := os.Getenv("HOME") + "/.cla/" + "config.ini"
 	dir, _ := filepath.Split(fpath)
-	// if f, err := os.Stat(dir); os.IsNotExist(err) || !f.IsDir() {
 	if isExists(dir) {
-		fmt.Println(dir)
 		if err := os.Mkdir(dir, 0774); err != nil {
 			outErrorExit(err.Error())
 		}
 	}
 
 	if isExists(fpath) {
-		fmt.Println("test")
 		writeToFile(defaultSetting, fpath)
-		// // if err := os.Rename("/home/fdr/git-mng/cla/config/config.ini", fpath); err != nil {
-		// // 	outErrorExit(err.Error())
-		// }
 	}
 
 	cfg, err := ini.Load(fpath)
