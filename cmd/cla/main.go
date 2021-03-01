@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	tinp "github.com/charmbracelet/bubbles/textinput"
@@ -17,21 +17,18 @@ import (
 )
 
 var (
-	color         = ter.ColorProfile().Color
-	focusedPrompt = colorSetting("⇒ ", focusedTextColor)
-	blurredPrompt = "  "
-
+	color              = ter.ColorProfile().Color
+	focusedPrompt      = colorSetting("⇒ ", focusedTextColor)
+	blurredPrompt      = "  "
 	focusedTextColor   = cfg.Config.FocusedTextColor
 	unfocusedTextColor = cfg.Config.UnfocusedTextColor
-	dataFile           = cfg.Config.DataFile
+	dataFile           = os.Getenv("HOME") + "/.cla/" + cfg.Config.DataFile
 	limitLineNumber    = cfg.Config.LimitLine
 	execKey            = cfg.Config.ExecKey
 	saveKey            = cfg.Config.SaveKey
 	delKey             = cfg.Config.DelKey
 	addKey             = cfg.Config.AddKey
 	quitKey            = cfg.Config.QuitKey
-	// focusedSubmitButton = "[ " + ter.String("Save").Foreground(color("82")).String() + " ]"
-	// blurredSubmitButton = "[ " + ter.String("Save").Foreground(color("240")).String() + " ]"
 )
 
 func colorSetting(srcStr, colorCode string) string {
@@ -51,6 +48,20 @@ func getShellName() string {
 	return shn
 }
 
+type Data struct {
+	ID  int    `json:"id"`
+	Cmd string `json:"cmd"`
+}
+
+func outErrorExit(err string) {
+	pc, _, line, _ := runtime.Caller(1)
+	f := runtime.FuncForPC(pc)
+	fmt.Printf("call from '%s' function (line %d) \n", f.Name(), line)
+	fmt.Printf("  err: %s\n", err)
+	fmt.Print("  ")
+	os.Exit(1)
+}
+
 func execCmd(cmd string) {
 	c := exec.Command(getShellName(), "-c", cmd)
 	c.Stdin = os.Stdin
@@ -58,8 +69,6 @@ func execCmd(cmd string) {
 	c.Stderr = os.Stderr
 	c.Run()
 }
-
-// var mdata = initialModel(result)
 
 func main() {
 	result := make(chan string, 1)
@@ -78,14 +87,79 @@ type model struct {
 	index     int
 	choice    chan string
 	cmdInputs []tinp.Model
-	// submitButton string
+}
+
+func isZeroSize(fp *os.File) bool {
+	info, err := fp.Stat()
+	if err != nil {
+		outErrorExit(err.Error())
+	}
+
+	if info.Size() == 0 {
+		return true
+	}
+	return false
+}
+
+func readFromJSON(fpath string) []Data {
+
+	if f, err := os.Stat(fpath); os.IsNotExist(err) || f.IsDir() {
+		dir, _ := filepath.Split(fpath)
+		if err := os.Mkdir(dir, 0774); err != nil {
+			outErrorExit(err.Error())
+		}
+
+	}
+
+	fp, err := os.OpenFile(fpath, os.O_RDONLY|os.O_CREATE, 0664)
+	if err != nil {
+		outErrorExit(err.Error())
+	}
+	defer fp.Close()
+
+	bytes, err := ioutil.ReadAll(fp)
+	if err != nil {
+		outErrorExit(err.Error())
+	}
+
+	// When the file is created, the initial data is written in json format.
+	// bytes variable the same.
+	if isZeroSize(fp) {
+		data := Data{0, ""}
+		s, _ := json.Marshal(data)
+		jsonFmtStr := "[" + string(s) + "]"
+		writeToFile(jsonFmtStr, dataFile)
+
+		bytes = []byte(jsonFmtStr)
+	}
+
+	var datas []Data
+	err = json.Unmarshal(bytes, &datas)
+	if err != nil {
+		outErrorExit(err.Error())
+	}
+
+	return datas
+}
+
+func removeElementOfData(datas []Data, rmLIdx int) []Data {
+	var newDatas []Data
+	var dataID = 0
+	for i, d := range datas {
+		if i == rmLIdx {
+			continue
+		}
+		d.ID = dataID
+		newDatas = append(newDatas, d)
+		dataID++
+	}
+	return newDatas
 }
 
 func readFromFile() []string {
-	f, err := os.OpenFile(dataFile, os.O_RDONLY, 0644)
+	f, err := os.OpenFile(dataFile, os.O_RDONLY, 0664)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "File %s could not open: %v\n", dataFile, err)
-		os.Exit(1)
+		outErrorExit(err.Error())
 	}
 	defer f.Close()
 
@@ -98,25 +172,23 @@ func readFromFile() []string {
 		}
 	}
 	if serr := scanner.Err(); serr != nil {
-		fmt.Fprintf(os.Stderr, "File %s scan error: %v\n", dataFile, err)
+		outErrorExit(err.Error())
 	}
 
 	return lines
 }
 
-func writeToFile(lines string) {
-	err := ioutil.WriteFile(dataFile, []byte(lines), 0644)
+func writeToFile(bytes, fPath string) {
+	err := ioutil.WriteFile(fPath, []byte(bytes), 0664)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "File %s could not write: %v\n", dataFile, err)
-		os.Exit(1)
+		outErrorExit(err.Error())
 	}
 }
 
-func writeToFileWithBlankLine() {
-	// fmt.Println("execute this")
-	f, err := os.OpenFile(dataFile, os.O_APPEND|os.O_WRONLY, 0644)
+func writeToFileWithBlankLine(fPath string) {
+	f, err := os.OpenFile(fPath, os.O_APPEND|os.O_WRONLY, 0664)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "File %s could not write: %v\n", dataFile, err)
+		outErrorExit(err.Error())
 	}
 	defer f.Close()
 
@@ -125,7 +197,7 @@ func writeToFileWithBlankLine() {
 
 func initialModel(ch chan string) model {
 	tms := []tinp.Model{}
-	for i, cmd := range readFromFile() {
+	for i, j := range readFromJSON(dataFile) {
 		tm := tinp.NewModel()
 		if i == 0 {
 			tm.Focus()
@@ -135,7 +207,7 @@ func initialModel(ch chan string) model {
 			tm.Prompt = blurredPrompt
 		}
 		tm.Placeholder = "Unregistered."
-		tm.SetValue(cmd)
+		tm.SetValue(j.Cmd)
 		tm.CharLimit = 64
 		tm.Width = 64
 		tms = append(tms, tm)
@@ -145,42 +217,30 @@ func initialModel(ch chan string) model {
 	return model{0, ch, tms}
 }
 
-func LoggingSettings(logFile string) {
-	// RDWRはreadとwrite。パーミッションで0666は読み書きができるユーザーその他。
-	logfile, _ := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	multiLogFile := io.MultiWriter(os.Stdout, logfile)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	log.SetOutput(multiLogFile)
-}
+// func LoggingSettings(logFile string) {
+// 	// RDWRはreadとwrite。パーミッションで0666は読み書きができるユーザーその他。
+// 	logfile, _ := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+// 	multiLogFile := io.MultiWriter(os.Stdout, logfile)
+// 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+// 	log.SetOutput(multiLogFile)
+// }
 
 func (m *model) addModel() {
-	// LoggingSettings("test.log")
-	// log.Printf("before %v", cap(m.cmdInputs))
 	tm := tinp.NewModel()
 	tm.Placeholder = "Unregistered"
 	tm.Prompt = blurredPrompt
 	tm.CharLimit = 64
 	tm.Width = 64
-	tm.SetValue("test")
+	tm.SetValue("")
 	m.cmdInputs = append(m.cmdInputs, tm)
-	// log.Printf("after %v", cap(m.cmdInputs))
 }
 
 func (m *model) removeModel(i int) {
-	// m.cmdInputs
-
 	if i >= len(m.cmdInputs) {
 		return
 	}
 	m.cmdInputs = append(m.cmdInputs[:i], m.cmdInputs[i+1:]...)
 }
-
-// func unset(s []string, i int) []string {
-// 	if i >= len(s) {
-// 		return s
-// 	}
-// 	append(s[:i], s[i+1:]...)
-// }
 
 func (m model) Init() tea.Cmd {
 	return tinp.Blink
@@ -191,16 +251,6 @@ var selectCmd string
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	// inputs := m.cmdInputs
-	// isUnderLimit := false
-	// if len(inputs) > limitLineNumber {
-	// 	isUnderLimit = true
-	// }
-	// LoggingSettings("test.log")
-	// log.Printf("in the Update: %v %v", cap(m.cmdInputs), len(m.cmdInputs))
-
-	// writeToFileWithBlankLine()
-	// m.addModel()
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -210,14 +260,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case addKey:
-			if len(m.cmdInputs) < limitLineNumber {
-				writeToFileWithBlankLine()
-				m.addModel()
+			if len(m.cmdInputs) >= limitLineNumber {
+				return m, nil
 			}
-
-		// 	// return m, nil
-
-		// case "ctrl+d":
+			newDatas := readFromJSON(dataFile)
+			tailNumber := len(m.cmdInputs)
+			emptyData := Data{tailNumber, ""}
+			newDatas = append(newDatas, emptyData)
+			newJsons, _ := json.Marshal(newDatas)
+			writeToFile(string(newJsons), dataFile)
+			m.addModel()
 
 		// Cycle between inputs
 		case "tab", "shift+tab", execKey, "up", "down", saveKey, delKey:
@@ -226,37 +278,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			// Did the user press enter while the submit button was focused?
 			// If so, exit.
-			var cmdlines string
-			// if s == "enter" && m.index == len(inputs) {
-			// 	for i := 0; i < len(inputs); i++ {
-			// 		cmdlines += inputs[i].Value() + "\n"
-			// 	}
-			// 	writeToFile(cmdlines)
-			// 	//return m, tea.Quit
-			// } else if s == "enter" || s == "ctrl+s" {
-			// 	selectCmd = inputs[m.index].Value()
-			// 	return m, tea.Quit
-			// }
-			if s == saveKey {
-				for i := 0; i < len(m.cmdInputs); i++ {
-					cmdlines += m.cmdInputs[i].Value() + "\n"
-				}
-				writeToFile(cmdlines)
-				//return m, tea.Quit
-			} else if s == delKey {
-				for i, cmd := range readFromFile() {
-					if i == m.index {
-						continue
-					}
-					cmdlines += cmd + "\n"
-				}
-				// log.Printf("in the Update: %v", cmdlines)
-				writeToFile(cmdlines)
-				// log.Printf("in the Update: inputs %v", len(m.cmdInputs))
-				m.removeModel(m.index)
-				// log.Printf("in the Update: inputs %v", len(m.cmdInputs))
+			// var cmdlines string
 
-				//return m, tea.Quit
+			if s == saveKey {
+				var newDatas []Data
+				var tmpData Data
+				for i := 0; i < len(m.cmdInputs); i++ {
+					tmpData.ID = i
+					tmpData.Cmd = m.cmdInputs[i].Value()
+					newDatas = append(newDatas, tmpData)
+				}
+				newJsons, _ := json.Marshal(newDatas)
+				writeToFile(string(newJsons), dataFile)
+			} else if s == delKey {
+				// Load from file again to avoid unintended saving.
+				oldDatas := readFromJSON(dataFile)
+				newDatas := removeElementOfData(oldDatas, m.index)
+				newJsons, _ := json.Marshal(newDatas)
+				writeToFile(string(newJsons), dataFile)
+				m.removeModel(m.index)
+
+				// oldDatas := readFromJSON(dataFile)
+				// newDatas := append(oldDatas[:m.index], oldDatas[m.index+1:]...)
+				// newJsons, _ := json.Marshal(newDatas)
+				// writeToFile(string(newJsons), dataFile)
+				// m.removeModel(m.index)
 			}
 
 			if s == execKey {
@@ -264,7 +310,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 
-			// Cycle indexes
 			// Cycle indexes
 			if s == "up" || s == "shift+tab" {
 				m.index--
@@ -277,21 +322,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.index < 0 {
 				m.index = len(m.cmdInputs)
 			}
-			// if s == "up" || s == "shift+tab" {
-			// 	// if m.index < 0 {
-			// 	// 	m.index = 0
-			// 	// } else {
-			// 	m.index--
-			// 	// }
-			// } else if s == "down" || s == "tab" {
-			// 	m.index++
-			// }
-
-			// if m.index >= len(m.cmdInputs) {
-			// 	m.index = len(m.cmdInputs)
-			// } else if m.index < 0 {
-			// 	m.index = 0
-			// }
 
 			for i := 0; i <= len(m.cmdInputs)-1; i++ {
 				if i == m.index {
@@ -306,19 +336,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cmdInputs[i].Prompt = blurredPrompt
 				m.cmdInputs[i].TextColor = ""
 			}
-
-			// for i := 0; i < len(m.cmdInputs); i++ {
-			// 	m.cmdInputs[i] = m.cmdInputs[i]
-			// }
-			// m.nameInput = inputs[0]
-			// m.cmdInputs[0] = inputs[0]
-			// m.cmdInputs[1] = inputs[1]
-
-			// if m.index == len(inputs) {
-			// 	m.submitButton = focusedSubmitButton
-			// } else {
-			// 	m.submitButton = blurredSubmitButton
-			// }
 
 			return m, nil
 		}
@@ -348,7 +365,6 @@ func updateInputs(msg tea.Msg, m model) (model, tea.Cmd) {
 
 func (m model) View() string {
 	s := "\n"
-	// s += "* Which command do you want to run ?\n\n"
 
 	inputs := []string{}
 	for i := 0; i < len(m.cmdInputs); i++ {
@@ -357,26 +373,17 @@ func (m model) View() string {
 
 	for i := 0; i < len(inputs); i++ {
 		s += fmt.Sprintf("%2d: %s\n", i, inputs[i])
-		// if i < len(inputs)-1 {
-		// 	s += "\n"
-		// }
 	}
+
 	s += "\n"
-	s += colorSetting("+---------------------------------------+\n", unfocusedTextColor)
-	s += colorSetting("| enter      ... Execute selected line. |\n", unfocusedTextColor)
-	s += colorSetting("| ctrl+[q|z] ... Exit.                  |\n", unfocusedTextColor)
-	s += colorSetting("| ctrl+s     ... Save lines.            |\n", unfocusedTextColor)
-	s += colorSetting("| ctrl+d     ... Remove current line.   |\n", unfocusedTextColor)
-	s += colorSetting("| ctrl+a     ... Add a line at the end. |\n", unfocusedTextColor)
-	s += colorSetting("+---------------------------------------+\n", unfocusedTextColor)
+	s += colorSetting("______________________________________________\n", unfocusedTextColor)
+	s += colorSetting(fmt.Sprintf("| %-17s | Execute selected line.  |\n", execKey), unfocusedTextColor)
+	s += colorSetting(fmt.Sprintf("| %-17s | Save lines.             |\n", saveKey), unfocusedTextColor)
+	s += colorSetting(fmt.Sprintf("| %-17s | Remove current line.    |\n", delKey), unfocusedTextColor)
+	s += colorSetting(fmt.Sprintf("| %-17s | Add a line at end.      |\n", addKey), unfocusedTextColor)
+	s += colorSetting(fmt.Sprintf("| %-17s | Exit.                   |\n", quitKey), unfocusedTextColor)
+	s += colorSetting("|_____________________________________________|\n", unfocusedTextColor)
 	s += "\n"
-	// s += "\n\n  " + m.submitButton + "\n\n"
-	// s += string(len(inputs))
-	// s += "\n\n  " + string(m.index) + "\n\n"
-	// mdata.cmdInputs = append(mdata.cmdInputs, tinp.NewModel())
-	// mdata.cmdInputs[1].SetValue("aaaaa")
-	// s += mdata.cmdInputs[1].Value()
-	// s += "\n\n  " + m.Value + "\n\n"
 
 	return s
 }
