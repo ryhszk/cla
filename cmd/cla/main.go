@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,20 +8,22 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"syscall"
 
 	tinp "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	ter "github.com/muesli/termenv"
 	cfg "github.com/ryhszk/cla/config"
+	"golang.org/x/term"
 )
 
 var (
 	color              = ter.ColorProfile().Color
-	focusedPrompt      = colorSetting("⇒ ", focusedTextColor)
+	focusedPrompt      = colorSetting("> ", focusedTextColor)
 	blurredPrompt      = "  "
 	focusedTextColor   = cfg.Config.FocusedTextColor
 	unfocusedTextColor = cfg.Config.UnfocusedTextColor
-	dataFile           = os.Getenv("HOME") + "/.cla/" + cfg.Config.DataFile
+	dataFile           = os.Getenv("HOME") + "/.cla" + cfg.Config.DataFile
 	limitLineNumber    = cfg.Config.LimitLine
 	execKey            = cfg.Config.ExecKey
 	saveKey            = cfg.Config.SaveKey
@@ -77,6 +78,7 @@ func main() {
 		fmt.Printf("could not start program: %s\n", err)
 		os.Exit(1)
 	}
+
 	var cmd string
 	if cmd = <-result; cmd != "" {
 		execCmd(cmd)
@@ -114,14 +116,6 @@ func readFromJSON(fpath string) []Data {
 			outErrorExit(err.Error())
 		}
 	}
-
-	// if f, err := os.Stat(fpath); os.IsNotExist(err) || f.IsDir() {
-	// 	dir, _ := filepath.Split(fpath)
-	// 	if err := os.Mkdir(dir, 0774); err != nil {
-	// 		outErrorExit(err.Error())
-	// 	}
-
-	// }
 
 	fp, err := os.OpenFile(fpath, os.O_RDONLY|os.O_CREATE, 0664)
 	if err != nil {
@@ -168,43 +162,11 @@ func removeElementOfData(datas []Data, rmLIdx int) []Data {
 	return newDatas
 }
 
-func readFromFile() []string {
-	f, err := os.OpenFile(dataFile, os.O_RDONLY, 0664)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-	defer f.Close()
-
-	lines := []string{}
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-		if len(lines) > limitLineNumber {
-			break
-		}
-	}
-	if serr := scanner.Err(); serr != nil {
-		outErrorExit(err.Error())
-	}
-
-	return lines
-}
-
 func writeToFile(bytes, fPath string) {
 	err := ioutil.WriteFile(fPath, []byte(bytes), 0664)
 	if err != nil {
 		outErrorExit(err.Error())
 	}
-}
-
-func writeToFileWithBlankLine(fPath string) {
-	f, err := os.OpenFile(fPath, os.O_APPEND|os.O_WRONLY, 0664)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-	defer f.Close()
-
-	fmt.Fprintln(f, "test")
 }
 
 func initialModel(ch chan string) model {
@@ -218,31 +180,21 @@ func initialModel(ch chan string) model {
 		} else {
 			tm.Prompt = blurredPrompt
 		}
-		tm.Placeholder = "Unregistered."
+		tm.Placeholder = "Input any command."
 		tm.SetValue(j.Cmd)
-		tm.CharLimit = 64
-		tm.Width = 64
+		tm.CharLimit = 99
+		tm.Width = 99
 		tms = append(tms, tm)
 	}
-
-	// return model{0, inputs, blurredSubmitButton}
 	return model{0, ch, tms}
 }
 
-// func LoggingSettings(logFile string) {
-// 	// RDWRはreadとwrite。パーミッションで0666は読み書きができるユーザーその他。
-// 	logfile, _ := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-// 	multiLogFile := io.MultiWriter(os.Stdout, logfile)
-// 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-// 	log.SetOutput(multiLogFile)
-// }
-
 func (m *model) addModel() {
 	tm := tinp.NewModel()
-	tm.Placeholder = "Unregistered"
+	tm.Placeholder = "Input any command."
 	tm.Prompt = blurredPrompt
-	tm.CharLimit = 64
-	tm.Width = 64
+	tm.CharLimit = 99
+	tm.Width = 99
 	tm.SetValue("")
 	m.cmdInputs = append(m.cmdInputs, tm)
 }
@@ -288,10 +240,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			s := msg.String()
 
-			// Did the user press enter while the submit button was focused?
-			// If so, exit.
-			// var cmdlines string
-
 			if s == saveKey {
 				var newDatas []Data
 				var tmpData Data
@@ -309,12 +257,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				newJsons, _ := json.Marshal(newDatas)
 				writeToFile(string(newJsons), dataFile)
 				m.removeModel(m.index)
-
-				// oldDatas := readFromJSON(dataFile)
-				// newDatas := append(oldDatas[:m.index], oldDatas[m.index+1:]...)
-				// newJsons, _ := json.Marshal(newDatas)
-				// writeToFile(string(newJsons), dataFile)
-				// m.removeModel(m.index)
+				if m.index > len(m.cmdInputs)-1 {
+					m.index = -2 // 要素が消える分
+				} else {
+					m.index--
+				}
 			}
 
 			if s == execKey {
@@ -329,10 +276,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.index++
 			}
 
-			if m.index > len(m.cmdInputs) {
+			if m.index > len(m.cmdInputs)-1 {
 				m.index = 0
-			} else if m.index < 0 {
-				m.index = len(m.cmdInputs)
+			}
+
+			if m.index < 0 {
+				m.index = len(m.cmdInputs) - 1
 			}
 
 			for i := 0; i <= len(m.cmdInputs)-1; i++ {
@@ -376,25 +325,39 @@ func updateInputs(msg tea.Msg, m model) (model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	_, h, _ := term.GetSize(syscall.Stdin)
 	s := "\n"
-
+	s += colorSetting("______________________________________________\n", unfocusedTextColor)
 	inputs := []string{}
 	for i := 0; i < len(m.cmdInputs); i++ {
 		inputs = append(inputs, m.cmdInputs[i].View())
 	}
 
-	for i := 0; i < len(inputs); i++ {
-		s += fmt.Sprintf("%2d: %s\n", i, inputs[i])
+	var lineNum int
+	limit := h - 10
+
+	if m.index >= limit {
+		lineNum = (m.index + 1) - limit
+	} else {
+		lineNum = 0
 	}
 
-	s += "\n"
-	s += colorSetting("______________________________________________\n", unfocusedTextColor)
+	cnt := 0
+	for i := lineNum; i < len(inputs); i++ {
+		if cnt > limit-1 {
+			continue
+		}
+		cnt++
+		s += fmt.Sprintf("|%2d: %s\n", i, inputs[i])
+	}
+
+	s += colorSetting("+---------------------------------------------+\n", unfocusedTextColor)
 	s += colorSetting(fmt.Sprintf("| %-17s | Execute selected line.  |\n", execKey), unfocusedTextColor)
-	s += colorSetting(fmt.Sprintf("| %-17s | Save lines.             |\n", saveKey), unfocusedTextColor)
+	s += colorSetting(fmt.Sprintf("| %-17s | Save all lines.         |\n", saveKey), unfocusedTextColor)
 	s += colorSetting(fmt.Sprintf("| %-17s | Remove current line.    |\n", delKey), unfocusedTextColor)
 	s += colorSetting(fmt.Sprintf("| %-17s | Add a line at end.      |\n", addKey), unfocusedTextColor)
 	s += colorSetting(fmt.Sprintf("| %-17s | Exit.                   |\n", quitKey), unfocusedTextColor)
-	s += colorSetting("|_____________________________________________|\n", unfocusedTextColor)
+	s += colorSetting("+---------------------------------------------+\n", unfocusedTextColor)
 	s += "\n"
 
 	return s

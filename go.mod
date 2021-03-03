@@ -5,5 +5,6 @@ go 1.14
 require (
 	github.com/charmbracelet/bubbles v0.7.6 // indirect
 	github.com/charmbracelet/bubbletea v0.12.4 // indirect
+	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 	gopkg.in/ini.v1 v1.62.0
 )
