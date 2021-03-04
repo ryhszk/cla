@@ -3,17 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"syscall"
 
 	tinp "github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	ter "github.com/muesli/termenv"
+
 	cfg "github.com/ryhszk/cla/config"
+
+	util "github.com/ryhszk/cla/utils"
+
 	"golang.org/x/term"
 )
 
@@ -32,43 +32,10 @@ var (
 	quitKey            = cfg.Config.QuitKey
 )
 
-func colorSetting(srcStr, colorCode string) string {
-	return ter.String(srcStr).Foreground(color(colorCode)).String()
-}
-
-func getShellName() string {
-	var shn string
-	switch runtime.GOOS {
-	case "windows":
-		shn = "bash.exe"
-	case "linux":
-		shn = "sh"
-	default:
-		shn = "sh"
-	}
-	return shn
-}
-
-type Data struct {
-	ID  int    `json:"id"`
-	Cmd string `json:"cmd"`
-}
-
-func outErrorExit(err string) {
-	pc, _, line, _ := runtime.Caller(1)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("call from '%s' function (line %d) \n", f.Name(), line)
-	fmt.Printf("  err: %s\n", err)
-	fmt.Print("  ")
-	os.Exit(1)
-}
-
-func execCmd(cmd string) {
-	c := exec.Command(getShellName(), "-c", cmd)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	c.Run()
+type model struct {
+	index     int
+	choice    chan string
+	cmdInputs []tinp.Model
 }
 
 func main() {
@@ -81,97 +48,17 @@ func main() {
 
 	var cmd string
 	if cmd = <-result; cmd != "" {
-		execCmd(cmd)
+		util.Execute(cmd)
 	}
 }
 
-type model struct {
-	index     int
-	choice    chan string
-	cmdInputs []tinp.Model
-}
-
-func isZeroSize(fp *os.File) bool {
-	info, err := fp.Stat()
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-
-	if info.Size() == 0 {
-		return true
-	}
-	return false
-}
-
-func isExists(name string) bool {
-	_, err := os.Stat(name)
-	return err != nil
-}
-
-func readFromJSON(fpath string) []Data {
-
-	dir, _ := filepath.Split(fpath)
-	if isExists(dir) {
-		if err := os.Mkdir(dir, 0774); err != nil {
-			outErrorExit(err.Error())
-		}
-	}
-
-	fp, err := os.OpenFile(fpath, os.O_RDONLY|os.O_CREATE, 0664)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-	defer fp.Close()
-
-	bytes, err := ioutil.ReadAll(fp)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-
-	// When the file is created, the initial data is written in json format.
-	// bytes variable the same.
-	if isZeroSize(fp) {
-		data := Data{0, ""}
-		s, _ := json.Marshal(data)
-		jsonFmtStr := "[" + string(s) + "]"
-		writeToFile(jsonFmtStr, dataFile)
-
-		bytes = []byte(jsonFmtStr)
-	}
-
-	var datas []Data
-	err = json.Unmarshal(bytes, &datas)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-
-	return datas
-}
-
-func removeElementOfData(datas []Data, rmLIdx int) []Data {
-	var newDatas []Data
-	var dataID = 0
-	for i, d := range datas {
-		if i == rmLIdx {
-			continue
-		}
-		d.ID = dataID
-		newDatas = append(newDatas, d)
-		dataID++
-	}
-	return newDatas
-}
-
-func writeToFile(bytes, fPath string) {
-	err := ioutil.WriteFile(fPath, []byte(bytes), 0664)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
+func colorSetting(srcStr, colorCode string) string {
+	return ter.String(srcStr).Foreground(color(colorCode)).String()
 }
 
 func initialModel(ch chan string) model {
 	tms := []tinp.Model{}
-	for i, j := range readFromJSON(dataFile) {
+	for i, j := range util.ReadFromJSON(dataFile) {
 		tm := tinp.NewModel()
 		if i == 0 {
 			tm.Focus()
@@ -181,7 +68,7 @@ func initialModel(ch chan string) model {
 			tm.Prompt = blurredPrompt
 		}
 		tm.Placeholder = "Input any command."
-		tm.SetValue(j.Cmd)
+		tm.SetValue(j.Line)
 		tm.CharLimit = 99
 		tm.Width = 99
 		tms = append(tms, tm)
@@ -210,8 +97,6 @@ func (m model) Init() tea.Cmd {
 	return tinp.Blink
 }
 
-var selectCmd string
-
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -227,12 +112,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.cmdInputs) >= limitLineNumber {
 				return m, nil
 			}
-			newDatas := readFromJSON(dataFile)
+			newDatas := util.ReadFromJSON(dataFile)
 			tailNumber := len(m.cmdInputs)
-			emptyData := Data{tailNumber, ""}
+			emptyData := util.CmdData{tailNumber, ""}
 			newDatas = append(newDatas, emptyData)
 			newJsons, _ := json.Marshal(newDatas)
-			writeToFile(string(newJsons), dataFile)
+			util.WriteToFile(string(newJsons), dataFile)
 			m.addModel()
 
 		// Cycle between inputs
@@ -241,21 +126,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			s := msg.String()
 
 			if s == saveKey {
-				var newDatas []Data
-				var tmpData Data
+				var newDatas []util.CmdData
+				var tmpData util.CmdData
 				for i := 0; i < len(m.cmdInputs); i++ {
 					tmpData.ID = i
-					tmpData.Cmd = m.cmdInputs[i].Value()
+					tmpData.Line = m.cmdInputs[i].Value()
 					newDatas = append(newDatas, tmpData)
 				}
 				newJsons, _ := json.Marshal(newDatas)
-				writeToFile(string(newJsons), dataFile)
+				util.WriteToFile(string(newJsons), dataFile)
 			} else if s == delKey {
 				// Load from file again to avoid unintended saving.
-				oldDatas := readFromJSON(dataFile)
-				newDatas := removeElementOfData(oldDatas, m.index)
+				oldDatas := util.ReadFromJSON(dataFile)
+				newDatas := util.RemoveElementOfData(oldDatas, m.index)
 				newJsons, _ := json.Marshal(newDatas)
-				writeToFile(string(newJsons), dataFile)
+				util.WriteToFile(string(newJsons), dataFile)
 				m.removeModel(m.index)
 				if m.index > len(m.cmdInputs)-1 {
 					m.index = -2 // 要素が消える分

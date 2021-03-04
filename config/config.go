@@ -1,17 +1,16 @@
 package config
 
 import (
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"gopkg.in/ini.v1"
+
+	util "github.com/ryhszk/cla/utils"
 )
 
-type ConfigList struct {
+type configList struct {
 	// [main]
 	LimitLine          int
 	FocusedTextColor   string
@@ -25,6 +24,9 @@ type ConfigList struct {
 	// [data]
 	DataFile string
 }
+
+// For reading config.ini
+var Config configList
 
 const defaultSetting = `
 [main]
@@ -43,43 +45,17 @@ quit_key = ctrl+c
 data_file = data.json
 `
 
-var Config ConfigList
-
-// onaji
-func outErrorExit(err string) {
-	pc, _, line, _ := runtime.Caller(1)
-	f := runtime.FuncForPC(pc)
-	fmt.Printf("call from '%s' function (line %d) \n", f.Name(), line)
-	fmt.Printf("  err: %s\n", err)
-	fmt.Print("  ")
-	os.Exit(1)
-}
-
-// onaji
-func isExists(name string) bool {
-	_, err := os.Stat(name)
-	return err != nil
-}
-
-// onaji
-func writeToFile(bytes, fPath string) {
-	err := ioutil.WriteFile(fPath, []byte(bytes), 0664)
-	if err != nil {
-		outErrorExit(err.Error())
-	}
-}
-
 func init() {
 	fpath := os.Getenv("HOME") + "/.cla/" + "config.ini"
 	dir, _ := filepath.Split(fpath)
-	if isExists(dir) {
+	if util.IsExists(dir) {
 		if err := os.Mkdir(dir, 0774); err != nil {
-			outErrorExit(err.Error())
+			util.ErrorExit(err.Error())
 		}
 	}
 
-	if isExists(fpath) {
-		writeToFile(defaultSetting, fpath)
+	if util.IsExists(fpath) {
+		util.WriteToFile(defaultSetting, fpath)
 	}
 
 	cfg, err := ini.Load(fpath)
@@ -88,7 +64,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	Config = ConfigList{
+	Config = configList{
 		// [main]
 		LimitLine:          cfg.Section("main").Key("limit_line").MustInt(),
 		FocusedTextColor:   cfg.Section("main").Key("focused_text_color").String(),
