@@ -1,6 +1,7 @@
 cla
 ===
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/ryhszk/cla)](https://goreportcard.com/report/github.com/ryhszk/cla)
 [![Go](https://github.com/ryhszk/cll/actions/workflows/go.yml/badge.svg?branch=main)](https://github.com/ryhszk/cll/actions/workflows/go.yml)
 [![GitHub](https://img.shields.io/github/license/ryhszk/cll)](https://github.com/ryhszk/cll/blob/main/LICENSE)
 
