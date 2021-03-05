@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-func ErrorExit(err string) {
+func ErrExit(err string) {
 	pc, _, line, _ := runtime.Caller(1)
 	f := runtime.FuncForPC(pc)
 	fmt.Printf("call from '%s' function (line %d) \n", f.Name(), line)

@@ -6,6 +6,14 @@ import (
 	"runtime"
 )
 
+func ExecCmd(cmd string) {
+	c := exec.Command(shellName(), "-c", cmd)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	c.Run()
+}
+
 func shellName() string {
 	var shn string
 	switch runtime.GOOS {
@@ -17,12 +25,4 @@ func shellName() string {
 		shn = "sh"
 	}
 	return shn
-}
-
-func Execute(cmd string) {
-	c := exec.Command(shellName(), "-c", cmd)
-	c.Stdin = os.Stdin
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	c.Run()
 }
