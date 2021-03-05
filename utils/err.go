@@ -6,6 +6,10 @@ import (
 	"runtime"
 )
 
+// ErrExit is Print error (err) and, call to os.Exit(1).
+// The printout includes the name of the calling function,
+// the number of lines, and the error (err) that was passed.
+// No return.
 func ErrExit(err string) {
 	pc, _, line, _ := runtime.Caller(1)
 	f := runtime.FuncForPC(pc)
