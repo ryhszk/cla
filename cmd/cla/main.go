@@ -89,6 +89,7 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 
 		case quitKey:
 			close(m.choice)
+
 			bubbleCmd = bubble.Quit
 
 		case execKey:
@@ -123,7 +124,7 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 		case delKey:
 			// If there is only one line, deletion is prohibited.
 			// (Since m.index starts at 0, adjust with len()-1)
-			if m.index == len(m.txtModels)-1 {
+			if m.index == 0 && m.index == len(m.txtModels)-1 {
 				return m, nil
 			}
 
