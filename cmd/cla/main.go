@@ -121,9 +121,12 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 			bubbleCmd = nil
 
 		case delKey:
-			if m.index == 0 {
+			// If there is only one line, deletion is prohibited.
+			// (Since m.index starts at 0, adjust with len()-1)
+			if m.index == len(m.txtModels)-1 {
 				return m, nil
 			}
+
 			// Load from file again to avoid unintended saving.
 			oldD := util.FromJSON(dataFile)
 			newD := util.RmElem(oldD, m.index)
