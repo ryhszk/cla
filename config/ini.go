@@ -24,7 +24,7 @@ type configList struct {
 	DataFile string
 }
 
-// For reading config.ini
+// Config is for loading config.ini, which has the type configlist.
 var Config configList
 
 const defaultSetting = `

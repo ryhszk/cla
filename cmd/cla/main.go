@@ -66,7 +66,7 @@ func initialModel(ch chan string) model {
 		tm := txtinp.NewModel()
 		tm.Width = 99
 		tm.CharLimit = 99
-		tm.SetValue(j.Line)
+		tm.SetValue(j.CmdLine)
 		tm.Placeholder = "Input any command."
 		if i != 0 {
 			tm.Prompt = blurredPrompt
@@ -96,11 +96,11 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 			bubbleCmd = bubble.Quit
 
 		case saveKey:
-			var newDatas []util.CmdData
-			var tmpData util.CmdData
+			var newDatas []util.JsonData
+			var tmpData util.JsonData
 			for i := 0; i < len(m.txtModels); i++ {
 				tmpData.ID = i
-				tmpData.Line = m.txtModels[i].Value()
+				tmpData.CmdLine = m.txtModels[i].Value()
 				newDatas = append(newDatas, tmpData)
 			}
 			newJsons, _ := json.Marshal(newDatas)
@@ -113,7 +113,7 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 			}
 			newDatas := util.FromJSON(dataFile)
 			tailNumber := len(m.txtModels)
-			emptyData := util.CmdData{tailNumber, ""}
+			emptyData := util.JsonData{tailNumber, ""}
 			newDatas = append(newDatas, emptyData)
 			newJsons, _ := json.Marshal(newDatas)
 			util.ToFile(string(newJsons), dataFile)
@@ -125,10 +125,10 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 				return m, nil
 			}
 			// Load from file again to avoid unintended saving.
-			oldDatas := util.FromJSON(dataFile)
-			newDatas := util.RemoveElement(oldDatas, m.index)
-			newJsons, _ := json.Marshal(newDatas)
-			util.ToFile(string(newJsons), dataFile)
+			oldD := util.FromJSON(dataFile)
+			newD := util.RmElem(oldD, m.index)
+			newJ, _ := json.Marshal(newD)
+			util.ToFile(string(newJ), dataFile)
 			m.rmModel(m.index)
 			// End of line case
 			if m.index > len(m.txtModels)-1 {

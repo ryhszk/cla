@@ -7,17 +7,23 @@ import (
 	"path/filepath"
 )
 
-type CmdData struct {
-	ID   int    `json:"id"`
-	Line string `json:"cmd"`
+// JsonData has the following data in json format.
+// ID      ... Number for command identification.
+// CmdLine ... User entered and saved string (command).
+type JsonData struct {
+	ID      int    `json:"id"`
+	CmdLine string `json:"cmd"`
 }
 
-func FromJSON(fpath string) []CmdData {
-	dir, _ := filepath.Split(fpath)
+// FromJSON returns the data read from fPath as an array of type JsonData.
+// If the contents of fPath are empty, write JsonData{0, ""} to a new file
+// and use it as the read file (fPath).
+func FromJSON(fPath string) []JsonData {
+	dir, _ := filepath.Split(fPath)
 
 	AssumeDirExists(dir)
 
-	fp, err := os.OpenFile(fpath, os.O_RDONLY|os.O_CREATE, 0664)
+	fp, err := os.OpenFile(fPath, os.O_RDONLY|os.O_CREATE, 0664)
 	if err != nil {
 		ErrExit(err.Error())
 	}
@@ -31,35 +37,36 @@ func FromJSON(fpath string) []CmdData {
 	// When the file is created, the initial data is written in json format.
 	// bytes variable the same.
 	if isZero(fp) {
-		data := CmdData{0, ""}
+		data := JsonData{0, ""}
 		s, _ := json.Marshal(data)
-		jsonFmtStr := "[" + string(s) + "]"
-		ToFile(jsonFmtStr, fpath)
+		jsonFmt := "[" + string(s) + "]"
+		ToFile(jsonFmt, fPath)
 
-		bytes = []byte(jsonFmtStr)
+		bytes = []byte(jsonFmt)
 	}
 
-	var datas []CmdData
-	err = json.Unmarshal(bytes, &datas)
-	if err != nil {
+	var cds []JsonData
+	if err = json.Unmarshal(bytes, &cds); err != nil {
 		ErrExit(err.Error())
 	}
 
-	return datas
+	return cds
 }
 
-func RemoveElement(datas []CmdData, rmLIdx int) []CmdData {
-	var newDatas []CmdData
-	var dataID = 0
-	for i, d := range datas {
+// RmElem returns an array of type JsonData with
+// the elements of rmIndx removed from cds.
+func RmElem(cds []JsonData, rmLIdx int) []JsonData {
+	var newD []JsonData
+	var id = 0
+	for i, d := range cds {
 		if i == rmLIdx {
 			continue
 		}
-		d.ID = dataID
-		newDatas = append(newDatas, d)
-		dataID++
+		d.ID = id
+		newD = append(newD, d)
+		id++
 	}
-	return newDatas
+	return newD
 }
 
 func isZero(fp *os.File) bool {

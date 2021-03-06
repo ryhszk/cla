@@ -6,8 +6,8 @@ import (
 	"runtime"
 )
 
-// ErrExit is Print error (err) and, call to os.Exit(1).
-// The printout includes the name of the calling function,
+// ErrExit is Print (stdout) error (err) and, call to os.Exit(1).
+// The output includes the name of the calling function,
 // the number of lines, and the error (err) that was passed.
 // No return.
 func ErrExit(err string) {
