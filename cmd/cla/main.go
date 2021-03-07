@@ -17,10 +17,20 @@ import (
 	"golang.org/x/term"
 )
 
+type Mode int
+
+const (
+	_ Mode = iota
+	Normal
+	Edit
+	Search
+)
+
 type model struct {
-	index     int
+	cursor    int
 	choice    chan string
 	txtModels []txtinp.Model
+	mode      Mode
 }
 
 var (
@@ -75,7 +85,7 @@ func initialModel(ch chan string) model {
 		}
 		tms = append(tms, tm)
 	}
-	return model{0, ch, tms}
+	return model{0, ch, tms, Normal}
 }
 
 func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
@@ -90,10 +100,11 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 			bubbleCmd = bubble.Quit
 
 		case execKey:
-			m.choice <- m.txtModels[m.index].Value()
+			m.choice <- m.txtModels[m.cursor].Value()
 			bubbleCmd = bubble.Quit
 
 		case saveKey:
+			m.mode = Normal
 			var newDatas []util.JsonData
 			var tmpData util.JsonData
 			for i := 0; i < len(m.txtModels); i++ {
@@ -118,34 +129,42 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 
 		case delKey:
 			// If there is only one line, deletion is prohibited.
-			// (Since m.index starts at 0, adjust with len()-1)
-			if m.index == 0 && m.index == len(m.txtModels)-1 {
+			// (Since m.cursor starts at 0, adjust with len()-1)
+			if m.cursor == 0 && m.cursor == len(m.txtModels)-1 {
 				return m, nil
 			}
 
 			// Load from file again to avoid unintended saving.
 			oldD := util.FromJSON(dataFile)
-			newD := util.RmElem(oldD, m.index)
+			newD := util.RmElem(oldD, m.cursor)
 			newJ, _ := json.Marshal(newD)
 			util.ToFile(string(newJ), dataFile)
-			m.rmModel(m.index)
+			m.rmModel(m.cursor)
 			// End of line case
-			if m.index > len(m.txtModels)-1 {
-				m.index--
+			if m.cursor > len(m.txtModels)-1 {
+				m.cursor--
 			}
 			m.cycleCursor()
 
 		case "down", "tab":
-			m.index++
+			m.cursor++
 			m.cycleCursor()
 
 		case "up", "shift+tab":
-			m.index--
+			m.cursor--
 			m.cycleCursor()
+
+		case "ctrl+e":
+			m.mode = Edit
+
+		case "esc":
+			m.mode = Normal
 
 		default:
 			// Handle character input and blinks
-			m, bubbleCmd = updateInputs(msg, m)
+			if m.mode == Edit {
+				m, bubbleCmd = updateInputs(msg, m)
+			}
 		}
 	}
 
@@ -171,14 +190,14 @@ func updateInputs(msg bubble.Msg, m model) (model, bubble.Cmd) {
 
 func (m *model) cycleCursor() {
 
-	if m.index > len(m.txtModels)-1 {
-		m.index = 0
-	} else if m.index < 0 {
-		m.index = len(m.txtModels) - 1
+	if m.cursor > len(m.txtModels)-1 {
+		m.cursor = 0
+	} else if m.cursor < 0 {
+		m.cursor = len(m.txtModels) - 1
 	}
 
 	for i := 0; i <= len(m.txtModels)-1; i++ {
-		if i == m.index {
+		if i == m.cursor {
 			// Set focused state
 			m.txtModels[i].Focus()
 			m.txtModels[i].Prompt = focusedPrompt
@@ -210,7 +229,7 @@ func (m *model) rmModel(i int) {
 func (m model) View() string {
 	// initial
 	_, h, _ := term.GetSize(syscall.Stdin)
-	adjh := h - 12
+	adjh := h - 13
 	inputs := []string{}
 	for i := 0; i < len(m.txtModels); i++ {
 		inputs = append(inputs, m.txtModels[i].View())
@@ -218,13 +237,31 @@ func (m model) View() string {
 
 	// header
 	s := "\n"
-	s += colorSetting("______________________________________________\n", unfocusedColor)
+
+	s += "+--------------+\n"
+	s += "| "
+	switch m.mode {
+	case Normal:
+		s += colorSetting("MODE: Normal ", unfocusedColor)
+	case Edit:
+		s += colorSetting("MODE: Edit   ", focusedColor)
+	case Search:
+		s += colorSetting("MODE: Search ", unfocusedColor)
+	}
+	s += "| \n"
+	s += "+--------------+\n"
+	// numDgt := strconv.Itoa(len(strconv.Itoa(limitLine)))
+	// cstFmt := "Line: %" + numDgt + "d/%" + numDgt + "d"
+	// s += fmt.Sprintf(cstFmt, m.index, len(m.txtModels)-1)
+	// s += "\n+--------------+--------------+\n"
+
+	// s += colorSetting("______________________________________________\n", unfocusedColor)
 
 	// body
 	totalLine := adjh
 	var fstLine int
-	if m.index >= totalLine {
-		fstLine = (m.index + 1) - totalLine
+	if m.cursor >= totalLine {
+		fstLine = (m.cursor + 1) - totalLine
 	} else {
 		fstLine = 0
 	}
@@ -250,7 +287,6 @@ func (m model) View() string {
 	s += colorSetting(fmt.Sprintf("| %-17s | Move down.              |\n", "↓ [tab]"), unfocusedColor)
 	s += colorSetting(fmt.Sprintf("| %-17s | Move up.                |\n", "↑ [shift+tab]"), unfocusedColor)
 	s += colorSetting("+---------------------------------------------+\n", unfocusedColor)
-	s += "\n"
 
 	return s
 }
