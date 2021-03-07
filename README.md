@@ -46,10 +46,7 @@ $ go get github.com/ryhszk/cla/cmd/cla
 3. Move the cursor to the command line you want to execute.
 4. Press `enter` to execute the command (current line).
 
-In addition, it has functions to save (`ctrl+s`), delete (`ctrl+d`), and edit (`ctrl+e`)commands.
-To exit, press `ctrl+c`.
-
-
+:memo: The data of the registration command and the configuration file are stored in `$HOME/.cla`.
 
 # Demo
 
