@@ -64,8 +64,6 @@ func initialModel(ch chan string) model {
 	tms := []txtinp.Model{}
 	for i, j := range util.FromJSON(dataFile) {
 		tm := txtinp.NewModel()
-		tm.Width = 99
-		tm.CharLimit = 99
 		tm.SetValue(j.CmdLine)
 		tm.Placeholder = "Input any command."
 		if i != 0 {
@@ -81,7 +79,7 @@ func initialModel(ch chan string) model {
 }
 
 func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
-	var bubbleCmd bubble.Cmd
+	var bubbleCmd bubble.Cmd = nil
 
 	switch msg := msg.(type) {
 	case bubble.KeyMsg:
@@ -89,7 +87,6 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 
 		case quitKey:
 			close(m.choice)
-
 			bubbleCmd = bubble.Quit
 
 		case execKey:
@@ -106,7 +103,6 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 			}
 			newJsons, _ := json.Marshal(newDatas)
 			util.ToFile(string(newJsons), dataFile)
-			bubbleCmd = nil
 
 		case addKey:
 			if len(m.txtModels) >= limitLine {
@@ -119,7 +115,6 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 			newJsons, _ := json.Marshal(newDatas)
 			util.ToFile(string(newJsons), dataFile)
 			m.addModel()
-			bubbleCmd = nil
 
 		case delKey:
 			// If there is only one line, deletion is prohibited.
@@ -139,17 +134,14 @@ func (m model) Update(msg bubble.Msg) (bubble.Model, bubble.Cmd) {
 				m.index--
 			}
 			m.cycleCursor()
-			bubbleCmd = nil
 
 		case "down", "tab":
 			m.index++
 			m.cycleCursor()
-			bubbleCmd = nil
 
 		case "up", "shift+tab":
 			m.index--
 			m.cycleCursor()
-			bubbleCmd = nil
 
 		default:
 			// Handle character input and blinks
@@ -202,8 +194,6 @@ func (m *model) cycleCursor() {
 
 func (m *model) addModel() {
 	tm := txtinp.NewModel()
-	tm.Width = 99
-	tm.CharLimit = 99
 	tm.SetValue("")
 	tm.Placeholder = "Input any command."
 	tm.Prompt = blurredPrompt
@@ -220,6 +210,7 @@ func (m *model) rmModel(i int) {
 func (m model) View() string {
 	// initial
 	_, h, _ := term.GetSize(syscall.Stdin)
+	adjh := h - 12
 	inputs := []string{}
 	for i := 0; i < len(m.txtModels); i++ {
 		inputs = append(inputs, m.txtModels[i].View())
@@ -230,7 +221,7 @@ func (m model) View() string {
 	s += colorSetting("______________________________________________\n", unfocusedColor)
 
 	// body
-	totalLine := h - 12
+	totalLine := adjh
 	var fstLine int
 	if m.index >= totalLine {
 		fstLine = (m.index + 1) - totalLine
