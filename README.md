@@ -1,4 +1,4 @@
-cla (stopped development :skull:)
+cla (Under development :construction:)
 ===
 
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ryhszk/cla)
@@ -10,8 +10,7 @@ cla (stopped development :skull:)
 
 cla is a Command line based LAuncher.
 
-Since the idea was not feasible for this project (it would require significant changes to fix), 
-we stopped development.
+(Under development. I may not be able to achieve what I want to do with this project, so it will be on hiatus for a while)
 
 # Support OS
 
