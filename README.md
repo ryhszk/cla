@@ -24,3 +24,35 @@ $ go get github.com/ryhszk/cla/cmd/cla
 ```
 
 # Usage
+
+1. Start `cla` command (Launches a TUI APP that looks like next).
+    ```
+    $ cla
+    +--------------+
+    | MODE: Normal | 
+    +--------------+
+    |  0:   free -h
+    |  1: > dstat -c -C 0,1,2
+    +---------------------------------------------+
+    | ctrl+c            | Exit.                   |
+    | enter             | Execute selected line.  |
+    | ctrl+s            | Save all lines.         |
+    | ctrl+a            | Add a line at end.      |
+    | ctrl+d            | Remove current line.    |
+    | ↓ [tab]           | Move down.              |
+    | ↑ [shift+tab]     | Move up.                |
+    +---------------------------------------------+
+    ```
+3. Move the cursor to the command line you want to execute.
+4. Press `enter` to execute the command (current line).
+
+In addition, it has functions to save (`ctrl+s`), delete (`ctrl+d`), and edit (`ctrl+e`)commands.
+To exit, press `ctrl+c`.
+
+
+
+# Demo
+
+![demo](https://github.com/ryhszk/cla/blob/main/assets/cla.gif)
+
+:warning: If the registered command is too long, the display may be lost.
