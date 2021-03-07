@@ -1,4 +1,4 @@
-cla (developing now)
+cla (stopped development :skull:)
 ===
 
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ryhszk/cla)
@@ -10,37 +10,17 @@ cla (developing now)
 
 cla is a Command line based LAuncher.
 
-(The name 'cla' reminded me of a CoeLAcanth. so, the above image)
+Since the idea was not feasible for this project (it would require significant changes to fix), 
+we stopped development.
 
 # Support OS
 
 - Linux
-- Windows (TBD)
 
 # Installation
 
 ```
-$ git clone https://github.com/ryhszk/cll
-$ cd cll
-$ go install
+$ go get github.com/ryhszk/cla/cmd/cla
 ```
 
 # Usage
-
-```
-$ cll
-Please select a command from next list.
-
-[ ] ls -la
-[>] free -h
-[ ] top
-[ ] ./count
-[ ] dstat
-
-Press q to quit.
-              total        used        free      shared  buff/cache   available
-Mem:          7.5Gi       3.6Gi       186Mi       229Mi       3.7Gi       3.5Gi
-Swap:         7.8Gi       344Mi       7.4Gi
-
-```
-```
