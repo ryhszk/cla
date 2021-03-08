@@ -50,5 +50,3 @@ $ go get github.com/ryhszk/cla/cmd/cla
 # Demo
 
 ![demo](https://github.com/ryhszk/cla/blob/main/assets/cla.gif)
-
-:warning: If the registered command is too long, the display may be lost.
